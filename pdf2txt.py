@@ -12,8 +12,7 @@ import en_core_web_sm
 import spacy
 nlp = spacy.load('en_core_web_sm')
 
-# nltk.download('punkt')
-# date = 2019/12/10
+import pymysql
 # import srsly.msgpack.util
 # import cymem.cymem
 # import distutils.command.build_ext
@@ -123,27 +122,27 @@ abstract_acknowlegement_min_len = 200
 
 
 # 数据库连接配置
-# db_setting = {
-#     'host': '127.0.0.1',
-#     'user': 'root',
-#     'password': '123',
-#     'port': 3306,
-#     'db': 'data',
-# }
+
+db_setting = {
+    'host': '127.0.0.1',
+    'user': 'root',
+    'password': '123',
+    'port': 3306,
+    'db': 'data_temp',
+}
 
 # 数据库表名
-table_name = 'pdf2txt_local_temp_test'
+table_name = 'db_temp'
 
 # 解析文件夹路径
-analysis_path = r'E:\work\CE'
+txt_dirs = [r'E:\work\funcpy']
 
 # txt文件应该写在那个目录下
-
-txt_file_path = os.path.dirname(os.path.abspath(__file__))  # 脚本临时运行下的文件夹
+txt_file_path = os.path.dirname(os.path.abspath(__file__))  # 脚本运行下的文件夹
 # *******************setting_re*****************end
 
 
-# ****************************n_everyone.py**************start
+# ****************************n_nottingham_everyone.py**************start
 # 定义没有关键字：by，需要删除前几行内容中存在的如下字符的行
 list_by_keywords = ['NIVERSITY', 'COLLEGE', 'EDUCATION', 'GRADUATE', 'INSTITUTE', 'PSYCHOLOGY']
 
@@ -169,26 +168,6 @@ def rm_title_interference(e_title, by=False):
         e_title = ' '.join(list_content[:3]).strip()  # 存在干扰字符从后面再匹配3行
     return e_title
 
-def Recommended_https(content, di_res, start_condition='Citation', end_condition='https'):
-    start_condition = start_condition
-    end_condition = end_condition
-    content = content.split('Recommended')[-1]
-    content = content.split(end_condition, 1)[0] + end_condition
-    content = content.replace('\n', ' ')
-    # e_title = r'''(%s)(.|\n)*?["':]((.|\n)*)?"(.|\n)*?(%s)''' % (start_condition, end_condition)
-    e_title = r'''(%s)["':]*((.|\n)*)?["\(]*(%s)''' % (start_condition, end_condition)
-    # e_title = r'(Recommended Citation)(.|\n)*?"((.|\n)*)?"(.|\n)*(https://lib.dr.iastate.edu/etd/)' % (start_condition, end_condition)
-    try:
-        e_title = re.search(e_title, content).group(2).strip()
-        # print('=====e_title===========', e_title)
-
-        di_res['TITTLE'] = e_title
-        # print('---every_one_university----', di_res)
-        return True
-    except Exception as e:
-        # print('=====title===========', e)
-        return False
-
 
 def every_one_university(*args, **kwargs):
     '''
@@ -202,204 +181,82 @@ def every_one_university(*args, **kwargs):
     author_name = args[2]
     di_res = args[3]
 
+    # 诺丁汉
     # 匹配tittle
-
-    if organ_name == 'ndh':
-
-        re_title = r'%s((.|\n)*?)(by|By|%s)' % ('eprints@nottingham.ac.uk', author_name)
-        try:
-            e_title = re.search(re_title, content).group(1)
-            di_res['TITTLE'] = rm_enter_key(e_title)
-            return
-        except Exception as e:
-            # print(e, '>>>>>> no ndh')
-            pass
+    re_title = r'%s((.|\n)*?)(by|By|%s)' % ('eprints@nottingham.ac.uk', author_name)
+    try:
+        e_title = re.search(re_title, content).group(1)
+        di_res['TITTLE'] = rm_enter_key(e_title)
+        return
+    except Exception as e:
+        # print(e, '>>>>>> no ndh')
+        pass
 
     # 路易斯
-    elif organ_name == 'lsu':
-        start_condition = 'Recommended Citation'
-        end_condition = 'http://digitalcommons.lsu.edu/'
-        re_name_title_doc_type = r'%s((.|\n)*)?"((.|\n)*?)(lsu|Lsu|LSU)?(.*)?%s' % (start_condition, end_condition)
-        try:
-            e_author_name = re.search(re_name_title_doc_type, content).group(1).strip(',')
-            e_title = re.search(re_name_title_doc_type, content).group(2).strip()
-            e_doc_type = re.search(re_name_title_doc_type, content).group(4).strip()
-            di_res['NAME'] = e_author_name
-            di_res['TITTLE'] = e_title
-            di_res['DOC_TYPE'] = e_doc_type
-            return
-        except Exception as e:
-            # print('>>>>>>  no lsu', e)
-            pass
-
-    #  Norwegian University of Science and Technology挪威科技
-    elif organ_name == 'Norwegian University of Science and Technology':
-        start_condition = 'Recommended Citation'
-        end_condition = 'http://digitalcommons.lsu.edu/'
-        re_name_title_doc_type = r'%s((.|\n)*)?"((.|\n)*?)(lsu|Lsu|LSU)?(.*)?%s' % (start_condition, end_condition)
-        try:
-            e_author_name = re.search(re_name_title_doc_type, content).group(1).strip(',')
-            e_title = re.search(re_name_title_doc_type, content).group(2).strip()
-            e_doc_type = re.search(re_name_title_doc_type, content).group(4).strip()
-            di_res['NAME'] = e_author_name
-            di_res['TITTLE'] = e_title
-            di_res['DOC_TYPE'] = e_doc_type
-            return
-        except Exception as e:
-            # print('>>>>>>  no lsu', e)
-            pass
-
-    elif organ_name == 'THE UNIVERSITY OF GHANA':
-        re_memorial_start = r"""((.|\n)*?((January|February|March|April|May|June|July|August|September|October|November|December)|(Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)[.,]*\s\d{4})|\d{4})"""
-        # re_memorial_start =r"""((.|\n)*?((January|February|March|April|May|June|July|August|September|October|November|December)|(Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)|(JAN|FEB|MAR|APR|AUG|SEPT|OCT|NOV|DEC)|(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER))[.,]*\s\d{4})"""
-        try:
-            e_start = re.match(re_memorial_start, content, re.I).group(1)
-        except Exception as e:
-            return
-
-    # Iowa State University Capstones 爱荷华州立************
-    elif organ_name == 'Iowa State University Capstones':
-        content = content.split('Recommended')[-1]
-        content = content.split('https://lib.dr.iastate.edu/etd/')[0] + 'https://lib.dr.iastate.edu/etd/'
-        start_condition = 'Citation'
-        end_condition = 'https://lib.dr.iastate.edu/etd/'
-        # e_title = r'''(%s)(.|\n)*?["':]((.|\n)*)?"(.|\n)*?(%s)''' % (start_condition, end_condition)
-        e_title = r'''(%s)(.|\n)*?["':]*((.|\n)*)?["\(]*(.|\n)*?(%s)''' % (start_condition, end_condition)
-        # e_title = r'(Recommended Citation)(.|\n)*?"((.|\n)*)?"(.|\n)*(https://lib.dr.iastate.edu/etd/)' % (start_condition, end_condition)
-        try:
-            e_title = re.search(e_title, content).group(3).strip()
-            # print('=====e_title===========', e_title)
-
-            di_res['TITTLE'] = e_title
-            # print('---every_one_university----', di_res)
-
-            return
-        except Exception as e:
-            print('=====title===========', e)
-            pass
-
-    # Old Dominion University  老自治领大学????
-    elif organ_name == 'Old Dominion University':
-        content = content.split('Recommended')[-1]
-        content = content.split('https://lib.dr.iastate.edu/etd/')[0] + 'https://lib.dr.iastate.edu/etd/'
-        start_condition = 'Citation'
-        end_condition = 'https://lib.dr.iastate.edu/etd/'
-        # e_title = r'''(%s)(.|\n)*?["':]((.|\n)*)?"(.|\n)*?(%s)''' % (start_condition, end_condition)
-        e_title = r'''(%s)(.|\n)*?["':]*((.|\n)*)?["\(]*(.|\n)*?(%s)''' % (start_condition, end_condition)
-        # e_title = r'(Recommended Citation)(.|\n)*?"((.|\n)*)?"(.|\n)*(https://lib.dr.iastate.edu/etd/)' % (start_condition, end_condition)
-        try:
-            e_title = re.search(e_title, content).group(3).strip()
-            # print('=====e_title===========', e_title)
-
-            di_res['TITTLE'] = e_title
-            # print('---every_one_university----', di_res)
-
-            return
-        except Exception as e:
-            print('=====title===========', e)
-            pass
-
-    # Western Washington University     
-
-
-    # Utah State University     
-    elif organ_name == 'Utah State University':
-        start_condition = 'Citation'
-        end_condition = 'https://digitalcommons.usu.edu/honors/'
-        content = content.split('Recommended')[-1]
-        content = content.split(end_condition)[0] + end_condition
-
-        # e_title = r'''(%s)(.|\n)*?["':]((.|\n)*)?"(.|\n)*?(%s)''' % (start_condition, end_condition)
-        e_title = r'''(%s)(.|\n)*?["':]*((.|\n)*)?["\(]*(.|\n)*?(%s)''' % (start_condition, end_condition)
-        # e_title = r'(Recommended Citation)(.|\n)*?"((.|\n)*)?"(.|\n)*(https://lib.dr.iastate.edu/etd/)' % (start_condition, end_condition)
-        try:
-            e_title = re.search(e_title, content).group(3).strip()
-            # print('=====e_title===========', e_title)
-
-            di_res['TITTLE'] = e_title
-            # print('---every_one_university----', di_res)
-
-            return
-        except Exception as e:
-            # print('=====title===========', e)
-            pass
-
-    # The Faculty of Humboldt State University  洪堡州立大学  
-    # 标题中存在部分关键词，被删除
-
-
-    # Missouri State University 密苏里州立大学
-    start_condition = 'Citation'
-    end_condition = 'https://bearworks.missouristate.edu/theses/'
-
-    # University of Arkansas 阿肯色大学
-    start_condition = 'Citation'
-    end_condition = 'https://scholarworks.uark.edu/cveguht/'
-
-    # Montclair State University  蒙特克莱尔州立大学
-    # 'https://digitalcommons.montclair.edu/etd/'
-
-    # Montclair State University  蒙特克莱尔州立大学
-    ''
-    # the University of Iowa  爱荷华大学
-    # by之前，三行或者lib-ir@uiowa.edu.到by之间
-
+    # elif organ_name == 'lsu':
+    start_condition = 'Recommended Citation'
+    end_condition = 'http://digitalcommons.lsu.edu/'
+    re_name_title_doc_type = r'%s((.|\n)*)?"((.|\n)*?)(lsu|Lsu|LSU)?(.*)?%s' % (start_condition, end_condition)
+    try:
+        e_author_name = re.search(re_name_title_doc_type, content).group(1).strip(',')
+        e_title = re.search(re_name_title_doc_type, content).group(2).strip()
+        e_doc_type = re.search(re_name_title_doc_type, content).group(4).strip()
+        di_res['NAME'] = e_author_name
+        di_res['TITTLE'] = e_title
+        di_res['DOC_TYPE'] = e_doc_type
+        return
+    except Exception as e:
+        # print('>>>>>>  no lsu', e)
+        pass
 
     # 通用匹配
 
+    re_memorial_start = r"""((.|\n)*?((January|February|March|April|May|June|July|August|September|October|November|December)|(Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)[.,]*\s\d{4})|\d{4})"""
     # re_memorial_start =r"""((.|\n)*?((January|February|March|April|May|June|July|August|September|October|November|December)|(Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)|(JAN|FEB|MAR|APR|AUG|SEPT|OCT|NOV|DEC)|(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER))[.,]*\s\d{4})"""
-    # try:
-    #     e_start = re.match(re_memorial_start, content, re.I).group(1)
-    res = Recommended_https(content, di_res)
-
-    # re_memorial_start = r"""((.|\n)*?((January|February|March|April|May|June|July|August|September|October|November|December)|(Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)[.,]*\s\d{4})|\d{4})"""
-    # try:
-    #     e_start = re.match(re_memorial_start, content, re.I).group(1)
-    # except Exception as e:
-    #     write_file('content没有内容.txt', di_res.get('ID'))
-    #     return
     try:
-        e_by = re.search(r'by', e_start, re.I).group()
-        e_title = re.search(r'((.|\n)*?)by', e_start, re.I).group(1)
-        e_author_name = re.search(r'by(\s|\n)*(.*)', e_start, re.I).group(2)
-
-        # 删除第一段内容中的存在干扰字符的行
-        e_title = rm_title_interference(e_title, by=True)
-
-        di_res['NAME'] = rm_enter_key(e_author_name)
-        di_res['TITTLE'] = rm_enter_key(e_title)
-
-        return
-
-    except Exception as e:
-        doc = nlp(e_start)
-        for attribute in doc.ents:
-            # print(attribute.text, attribute.label_)
-            if attribute.label_ == 'PERSON':
-                e_author_name = rm_enter_key(attribute.text)
-                di_res['NAME'] = rm_enter_key(e_author_name)
-
-            elif attribute.label_ == 'ORG':
-                e_org_name = rm_enter_key(attribute.text)
-                di_res['ORG'] = rm_enter_key(e_org_name)
-
-            elif attribute.label_ == 'DATE':
-                e_date = rm_enter_key(attribute.text)
-                di_res['e_date'] = rm_enter_key(e_date)
-
-        if author_name:
-            re_title_author = '((.|\n)*)?%s' % author_name
-            e_title = re.search(re_title_author, e_start).group()
+        e_start = re.match(re_memorial_start, content, re.I).group(1)
+        try:
+            e_by = re.search(r'by', e_start, re.I).group()
+            e_title = re.search(r'((.|\n)*?)by', e_start, re.I).group(1)
+            e_author_name = re.search(r'by(\s|\n)*(.*)', e_start, re.I).group(2)
 
             # 删除第一段内容中的存在干扰字符的行
-            e_title = rm_title_interference(e_title)
+            e_title = rm_title_interference(e_title, by=True)
 
-        else:
-            # 删除第一段内容中的存在干扰字符的行
-            e_title = rm_title_interference(content)
+            di_res['NAME'] = rm_enter_key(e_author_name)
+            di_res['TITTLE'] = rm_enter_key(e_title)
 
-        di_res['TITTLE'] = rm_enter_key(e_title)
-        return
+            return
+
+        except Exception as e:
+            doc = nlp(e_start)
+            for attribute in doc.ents:
+                # print(attribute.text, attribute.label_)
+                if attribute.label_ == 'PERSON':
+                    e_author_name = rm_enter_key(attribute.text)
+                    di_res['NAME'] = rm_enter_key(e_author_name)
+
+                elif attribute.label_ == 'ORG':
+                    e_org_name = rm_enter_key(attribute.text)
+                    di_res['ORG'] = rm_enter_key(e_org_name)
+
+                elif attribute.label_ == 'DATE':
+                    e_date = rm_enter_key(attribute.text)
+                    di_res['e_date'] = rm_enter_key(e_date)
+
+            if author_name:
+                re_title_author = '((.|\n)*)?%s' % author_name
+                e_title = re.search(re_title_author, e_start).group()
+
+                # 删除第一段内容中的存在干扰字符的行
+                e_title = rm_title_interference(e_title)
+
+            else:
+                # 删除第一段内容中的存在干扰字符的行
+                e_title = rm_title_interference(content)
+
+            di_res['TITTLE'] = rm_enter_key(e_title)
+            return
     except Exception as e:
         return
 # ****************************n_nottingham_everyone.py**************end
@@ -683,6 +540,12 @@ def respectively_extract(n_name, val_start, content, di_paragraph, di_res):
                     print('************di_paragraph中存在的字段进行解析完毕,退出************', e)
                     break
     # """
+    '''
+    学位：degree of Doctor|Doctorate|doctor|Ph D  博士
+         Master of|M.S.|M.S 硕士
+    专业：Philosophy|Science|Genetics    # /哲学|理工|遗传学
+    导师：supervision|supervisors|Supervised by
+    '''
     # 第一段中提取内容：degree、级别、作者名称、时间
     # 匹配doc_type 和degree是强关联的关系，不能这两个结果有差别
 
@@ -717,7 +580,7 @@ def respectively_extract(n_name, val_start, content, di_paragraph, di_res):
         val_degree = ''
     di_res['degree'.upper()] = rm_enter_key('the Degree of ' + val_degree)
 
-    # 专业
+    # 匹配专业
     list_major = ['Philosophy', 'Science', 'Genetics', ]  # 专业关键字
     # list_major_upper =
     str_major = '|'.join(list_major)
@@ -731,7 +594,7 @@ def respectively_extract(n_name, val_start, content, di_paragraph, di_res):
     di_res['major'.upper()] = rm_enter_key(val_major)
     di_res['id'.upper()] = n_name
 
-    # 院系
+    # 匹配院系
     re_department = r'(Department\s+of\s+(.|\n)*?\w+.*?[\.|\n])'
     try:
         val_department = re.search(re_department, content).group()
@@ -1088,29 +951,24 @@ def analysis_pat(content, n_name, table_name, n_path):
     if not references:
         references = di_paragraph.get('REFERENCES', '')
 
-
-
-    author_name = di_res.get('NAME')[:100] if len(di_res.get('NAME', '')) > 100 else di_res.get('NAME', '')
-    organ_name = '' if len(di_res.get('ORG', '')) > 200 else di_res.get('ORG', '')
-    supervisor = '' if len(di_res.get('SUPERVISOR', '')) > 200 else di_res.get('SUPERVISOR', '')
-    publish_time = '' if len(di_res.get('DATE', '')) > 200 else di_res.get('DATE', '')
-
-    
-    
-    # 引入通用匹配规则模板
-    # from nottingham_dir.n_nottingham_everyone import every_one_university
-    organ_name = 'xxxxxxxxx'
-    every_one_university(content, organ_name, author_name, di_res)
-    n_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # 将数据插入到数据库中
     # name之所以置空，是因为scapy没有识别出来人名，他返回原有字符串，插入时：error：data long
+    author_name = di_res.get('NAME')[:100] if len(di_res.get('NAME', '')) > 100 else di_res.get('NAME', '')
     # publist_time之所以置空，是因为scapy没有识别出来人名，他返回原有字符串，插入时：error：data long
+    publish_time = '' if len(di_res.get('DATE', '')) > 200 else di_res.get('DATE', '')
     # organ_name之所以置空，是因为scapy没有识别出来地名，他返回原有字符串，插入时：error：data long
+    organ_name = '' if len(di_res.get('ORG', '')) > 200 else di_res.get('ORG', '')
     # organ_name之所以置空，是因为scapy没有识别出来人名，他返回原有字符串，插入时：error：data long
+    supervisor = '' if len(di_res.get('SUPERVISOR', '')) > 200 else di_res.get('SUPERVISOR', '')
 
     title = di_res.get('TITTLE', '')[:500] if len(di_res.get('TITTLE', '')) > 500 else di_res.get('TITTLE', '')
 
     pdf_id = di_res.get('ID', '').rstrip('.pdf')
+    #     f.write(pdf_id + '\n')
+    # 引入通用匹配规则模板
+    # from nottingham_dir.n_nottingham_everyone import every_one_university
+    every_one_university(content, organ_name, author_name, di_res)
+    n_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 将数据插入到数据库中
     try:
         insert_sql = '''insert into %s (title, author, organ_name, publish_time, v_year, v_month, reference, doc_type, tutor, description, degree, major, department, pdf_id, subject, n_path, n_time) values ("%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s", "%s", "%s", "%s");''' \
                      % (table_name, title, author_name, organ_name, publish_time, di_res.get('YEAR', 0),
@@ -1142,7 +1000,6 @@ def analysis_txt(path, table_name):
             file_path = os.path.join(root, name)
             if name in list_no_words:
                 continue
-
             if ret1 and name.replace('.txt', '') in ret1:
                 print('已存在************%s'%file_path)
                 continue
@@ -1182,7 +1039,6 @@ if __name__ == '__main__':
     cursor.execute(select_pdf_id_sql)
     ret1 = cursor.fetchall()  # 取全部
     ret1 = list(map(lambda x:x.get('pdf_id'), ret1))
-
     # # 先清空数据表
     # clear_table_sql = '''
     #                 delete from %s
@@ -1192,19 +1048,19 @@ if __name__ == '__main__':
 
 
 # **********正式执行脚本取所有文件************start*****
-#     for analysis_path in txt_dirs:
-#         for root, dirs, filename in os.walk(analysis_path):
-#             for dir in dirs:
-#                 # if dir == '14.139.116.8':
-#                 #     continue
-#                 if os.path.isdir(root + os.path.sep + dir):
-#                     n_path = root + os.path.sep + dir
-#                     print('********%s开始********  %s' % (n_path, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-#                     analysis_txt(n_path, table_name)
-#                     print('********%s结束********  %s' % (n_path, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-#                 # break
+    for analysis_path in txt_dirs:
+        for root, dirs, filename in os.walk(analysis_path):
+            for dir in dirs:
+                # if dir == '14.139.116.8':
+                #     continue
+                if os.path.isdir(root + os.path.sep + dir):
+                    n_path = root + os.path.sep + dir
+                    print('********%s开始********  %s' % (n_path, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    analysis_txt(n_path, table_name)
+                    print('********%s结束********  %s' % (n_path, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                # break
 # **********正式执行脚本取所有文件************end******
-    analysis_txt(analysis_path, table_name)
+#     analysis_txt(analysis_path, table_name)
 
     cursor.close()
     conn.close()
